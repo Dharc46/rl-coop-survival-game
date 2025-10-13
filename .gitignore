@@ -5,23 +5,30 @@
 [Bb]uild/
 [Bb]uilds/
 [Ll]ogs/
-UserSettings/
 MemoryCaptures/
 sysinfo.txt
 
-# Visual Studio / JetBrains
+# Unity project settings user
+UserSettings/
+
+# Visual Studio / Rider
+.vs/
 *.csproj
-*.unityproj
 *.sln
 *.suo
-*.tmp
 *.user
 *.userprefs
 *.pidb
 *.booproj
 *.svd
-.vs/
 .idea/
+
+# Python virtual envs
+python_env/
+venv/
+.venv/
+env/
+ENV/
 
 # OS
 .DS_Store
