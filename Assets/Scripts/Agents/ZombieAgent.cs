@@ -4,11 +4,18 @@ using Unity.MLAgents.Sensors;
 using Unity.MLAgents.Actuators;
 
 /// <summary>
-/// ZombieAgent cho Demo V1.
-/// - Action (Discrete, 4): 0=Forward, 1=Backward, 2=Left(strafe), 3=Right(strafe)
-/// - Observations: relative position to player (x,z) normalized, agent forward (x,z) => 4 floats
-/// - Movement: Rigidbody-based MovePosition (strafe + forward/back)
-/// - Collision: OnTriggerEnter / OnCollisionEnter with Player để AddReward(1.0f) và EndEpisode()
+/// ZombieAgent - Continuous(2) actions version.
+/// Observations (6):
+///  - rel.x / roomSize
+///  - rel.z / roomSize
+///  - forward.x
+///  - forward.z
+///  - distance / roomSize
+///  - signedAngle/PI (in [-1,1])
+/// Actions (continuous 2):
+///  - actions[0] = forward speed factor (-1..1)
+///  - actions[1] = strafe speed factor (-1..1)
+/// Movement: Rigidbody.MovePosition
 /// </summary>
 [RequireComponent(typeof(Rigidbody), typeof(Collider))]
 public class ZombieAgent : Agent
@@ -21,6 +28,8 @@ public class ZombieAgent : Agent
     public float defaultMoveSpeed = 2f;
     public float successDistance = 0.8f;
     public int maxStepLimit = 500;
+    [Tooltip("Global multiplier to slow/speed agent for testing")]
+    public float speedMultiplier = 0.5f;
 
     [Header("Reward shaping")]
     [Tooltip("Scale for distance improvement reward (positive when getting closer).")]
@@ -55,7 +64,7 @@ public class ZombieAgent : Agent
         // reset velocities and rotation
         if (rb != null)
         {
-            rb.linearVelocity = Vector3.zero;         // fixed: use .velocity
+            rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
         }
 
@@ -88,50 +97,53 @@ public class ZombieAgent : Agent
     {
         if (playerTransform == null)
         {
-            // fallback zeros
+            // fallback zeros (6 floats)
             sensor.AddObservation(0f);
             sensor.AddObservation(0f);
             sensor.AddObservation(transform.forward.x);
             sensor.AddObservation(transform.forward.z);
+            sensor.AddObservation(0f); // distance
+            sensor.AddObservation(0f); // angle
             return;
         }
 
-        // relative position (player - agent) on X,Z, normalized by room size
-        Vector3 rel = playerTransform.position - transform.position;
+        Vector3 rel3 = playerTransform.position - transform.position;
+        Vector3 rel = new Vector3(rel3.x, 0f, rel3.z);
+        float dist = rel.magnitude;
+
+        // normalized rel x,z
         sensor.AddObservation(rel.x / _roomSize);
         sensor.AddObservation(rel.z / _roomSize);
 
-        // agent forward vector x,z
+        // forward x,z
         Vector3 f = transform.forward;
         sensor.AddObservation(f.x);
         sensor.AddObservation(f.z);
+
+        // distance normalized
+        sensor.AddObservation(Mathf.Clamp(dist / _roomSize, 0f, 1f));
+
+        // signed angle between forward and rel (range -PI..PI) normalized by PI => [-1,1]
+        Vector3 dirNorm = rel.magnitude > 0f ? rel.normalized : Vector3.forward;
+        float forwardDot = Vector3.Dot(transform.forward.normalized, dirNorm);
+        float rightDot = Vector3.Dot(transform.right.normalized, dirNorm);
+        float angleRad = Mathf.Atan2(rightDot, forwardDot); // signed
+        sensor.AddObservation(angleRad / Mathf.PI);
     }
 
     public override void OnActionReceived(ActionBuffers actionBuffers)
     {
-        // Discrete action single branch
-        int action = actionBuffers.DiscreteActions[0];
+        // Continuous actions: two floats in [-1,1]
+        float forwardInput = Mathf.Clamp(actionBuffers.ContinuousActions[0], -1f, 1f);
+        float strafeInput  = Mathf.Clamp(actionBuffers.ContinuousActions[1], -1f, 1f);
 
-        float forward = 0f;
-        float strafe = 0f;
-
-        switch (action)
-        {
-            case 0: forward = 1f; break;   // forward
-            case 1: forward = -1f; break;  // backward
-            case 2: strafe = -1f; break;   // left (strafe)
-            case 3: strafe = 1f; break;    // right (strafe)
-            default: break;
-        }
-
-        // compute desired movement in local space (forward and right)
-        Vector3 desiredLocal = transform.forward * forward + transform.right * strafe;
+        // scale and apply movement (use fixed delta for physics)
+        Vector3 desiredLocal = transform.forward * forwardInput + transform.right * strafeInput;
         Vector3 desiredDir = desiredLocal.sqrMagnitude > 0f ? desiredLocal.normalized : Vector3.zero;
-        Vector3 desiredWorld = desiredDir * moveSpeed * Time.fixedDeltaTime; // use fixed delta
+        Vector3 desiredWorld = desiredDir * moveSpeed * speedMultiplier * Time.fixedDeltaTime;
 
         if (rb != null)
         {
-            // Rigidbody-based movement (safer for physics)
             rb.MovePosition(rb.position + desiredWorld);
         }
         else
@@ -139,14 +151,14 @@ public class ZombieAgent : Agent
             transform.position += desiredWorld;
         }
 
-        // small time-step penalty to encourage faster completion
+        // time-step penalty
         AddReward(-0.001f);
 
-        // reward for reducing distance (shaping)
+        // distance shaping
         if (playerTransform != null)
         {
             float curDist = Vector3.Distance(transform.position, playerTransform.position);
-            float delta = lastDistance - curDist; // positive when getting closer
+            float delta = lastDistance - curDist;
             float shaped = Mathf.Clamp(delta * distanceRewardScale, distanceRewardMin, distanceRewardMax);
             AddReward(shaped);
 
@@ -170,7 +182,6 @@ public class ZombieAgent : Agent
         stepCount++;
         if (stepCount >= maxStepLimit)
         {
-            // timeout — end episode (no success reward)
             if (debugLogs) Debug.Log("[ZombieAgent] Timeout EndEpisode");
             EndEpisode();
         }
@@ -178,20 +189,21 @@ public class ZombieAgent : Agent
 
     public override void Heuristic(in ActionBuffers actionsOut)
     {
-        // map keys to discrete actions for manual testing (W,S,A,D)
-        var discrete = actionsOut.DiscreteActions;
-        discrete[0] = 0; // default forward
+        // provide continuous heuristic: W/S => forward (-1..1), A/D => strafe (-1..1)
+        var cont = actionsOut.ContinuousActions;
+        float f = 0f;
+        float s = 0f;
+        if (Input.GetKey(KeyCode.W)) f += 1f;
+        if (Input.GetKey(KeyCode.S)) f -= 1f;
+        if (Input.GetKey(KeyCode.D)) s += 1f;
+        if (Input.GetKey(KeyCode.A)) s -= 1f;
 
-        // Note: keep Heuristic only for testing — trainer/inference will override when running
-        if (Input.GetKey(KeyCode.W)) discrete[0] = 0; // forward
-        if (Input.GetKey(KeyCode.S)) discrete[0] = 1; // backward
-        if (Input.GetKey(KeyCode.A)) discrete[0] = 2; // left (strafe)
-        if (Input.GetKey(KeyCode.D)) discrete[0] = 3; // right (strafe)
+        cont[0] = Mathf.Clamp(f, -1f, 1f);
+        cont[1] = Mathf.Clamp(s, -1f, 1f);
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        // detect player collision (recommended: set Player collider or Zombie collider isTrigger = true)
         if (playerTransform != null && other.gameObject == playerTransform.gameObject)
         {
             AddReward(1.0f);
@@ -200,7 +212,6 @@ public class ZombieAgent : Agent
         }
     }
 
-    // fallback: optional OnCollisionEnter if you prefer non-trigger colliders
     private void OnCollisionEnter(Collision collision)
     {
         if (playerTransform != null && collision.gameObject == playerTransform.gameObject)
