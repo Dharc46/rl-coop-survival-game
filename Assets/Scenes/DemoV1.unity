@@ -370,10 +370,11 @@ GameObject:
   - component: {fileID: 1061401279}
   - component: {fileID: 1061401285}
   - component: {fileID: 1061401286}
+  - component: {fileID: 1061401287}
   m_Layer: 0
   m_Name: Zombie
   m_TagString: Untagged
-  m_Icon: {fileID: 0}
+  m_Icon: {fileID: 7250588514170254948, guid: 0000000000000000d000000000000000, type: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
@@ -395,7 +396,14 @@ MonoBehaviour:
   MaxStep: 0
   playerTransform: {fileID: 1064051764}
   enemyData: {fileID: 11400000, guid: 9515cf315e724944c90880281bd9be2b, type: 2}
+  defaultMoveSpeed: 2
+  successDistance: 0.8
   maxStepLimit: 500
+  speedMultiplier: 0.5
+  distanceRewardScale: 0.1
+  distanceRewardMin: -0.02
+  distanceRewardMax: 0.05
+  debugLogs: 0
 --- !u!114 &1061401280
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -409,19 +417,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_BrainParameters:
-    VectorObservationSize: 4
+    VectorObservationSize: 6
     NumStackedVectorObservations: 1
     m_ActionSpec:
-      m_NumContinuousActions: 0
-      BranchSizes: 04000000
-    VectorActionSize: 04000000
+      m_NumContinuousActions: 2
+      BranchSizes: 
+    VectorActionSize: 02000000
     VectorActionDescriptions: []
-    VectorActionSpaceType: 0
+    VectorActionSpaceType: 1
     hasUpgradedBrainParametersWithActionSpec: 1
   m_Model: {fileID: 0}
   m_InferenceDevice: 0
-  m_BehaviorType: 1
-  m_BehaviorName: My Behavior
+  m_BehaviorType: 0
+  m_BehaviorName: ZombieBehavior
   TeamId: 0
   m_UseChildSensors: 1
   m_UseChildActuators: 1
@@ -547,6 +555,33 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   moveSpeed: 2
   rotateSpeed: 120
+--- !u!54 &1061401287
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1061401278}
+  serializedVersion: 4
+  m_Mass: 1
+  m_Drag: 0
+  m_AngularDrag: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 80
+  m_CollisionDetection: 0
 --- !u!1 &1064051763
 GameObject:
   m_ObjectHideFlags: 0
@@ -562,7 +597,7 @@ GameObject:
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
-  m_Icon: {fileID: 0}
+  m_Icon: {fileID: -964228994112308473, guid: 0000000000000000d000000000000000, type: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
