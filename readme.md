@@ -48,7 +48,7 @@ pip install mlagents tensorboard
 
 ### 3. Chạy huấn luyện ZombieAgent
 
-Trong thư mục gốc repo, chạy lệnh:
+Trong thư mục venv, chạy lệnh:
 
 ```bash
 mlagents-learn ../config/trainer_config.yaml --run-id=demo_v1 --force
