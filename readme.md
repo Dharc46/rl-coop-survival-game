@@ -55,7 +55,7 @@ mlagents-learn ../config/trainer_config.yaml --run-id=demo_v1 --force
 ```
 
 - Quan sát log: Mean Reward sẽ tăng dần.
-- Sau khi huấn luyện (~200k bước), file `ZombieBehavior.onnx` sẽ được xuất ra trong `results/demo_v1/`.
+- Sau khi huấn luyện (~500k bước), file `ZombieBehavior.onnx` sẽ được xuất ra trong `results/demo_v1/`.
 
 ### 4. Tích hợp mô hình vào Unity
 
